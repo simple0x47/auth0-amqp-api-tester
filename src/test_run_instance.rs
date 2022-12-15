@@ -46,7 +46,7 @@ impl TestRunInstance {
     }
 
     async fn send_request(self, correlation_id: &str) -> Result<Self, Error> {
-        let request_payload = match serde_json::to_vec(self.test_request.data()) {
+        let request_payload = match serde_json::to_vec(self.test_request.request()) {
             Ok(request_payload) => request_payload,
             Err(error) => {
                 return Err(Error::new(

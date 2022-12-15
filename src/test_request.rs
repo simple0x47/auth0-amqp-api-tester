@@ -8,17 +8,17 @@ const REQUEST_HEADER_TOKEN: &str = "token";
 
 #[derive(Deserialize, Serialize)]
 pub struct TestRequest {
-    data: Map<String, Value>,
+    request: Map<String, Value>,
     expected_response: Value,
 }
 
 impl TestRequest {
-    pub fn data(&self) -> &Map<String, Value> {
-        &self.data
+    pub fn request(&self) -> &Map<String, Value> {
+        &self.request
     }
 
     pub fn inject_token(&mut self, token: &str) -> Result<(), Error> {
-        let header = match self.data.get_mut(REQUEST_HEADER) {
+        let header = match self.request.get_mut(REQUEST_HEADER) {
             Some(header) => match header.as_object_mut() {
                 Some(header) => header,
                 None => {
