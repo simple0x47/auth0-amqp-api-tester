@@ -1,0 +1,61 @@
+{
+  "name": "syntax",
+  "test_type": "Single",
+  "run_mode": "Sequential",
+  "requests": [
+    {
+      "name": "Empty request body & request header",
+      "request": {
+        "header": {
+          "token": "",
+          "element": "",
+          "action": ""
+        }
+      },
+      "expected_response": {
+        "Err": {
+          "kind": "MalformedRequest",
+          "message": "request sanitization failure: invalid action detected: "
+        }
+      }
+    }
+  ],
+  "request_amqp_configuration": {
+    "queue": {
+      "name": "demand",
+      "declare_options": {
+        "passive": false,
+        "durable": true,
+        "exclusive": false,
+        "auto_delete": true,
+        "nowait": false
+      },
+      "declare_arguments": {}
+    },
+    "publish_options": {
+      "mandatory": false,
+      "immediate": false
+    },
+    "publish_arguments": {}
+  },
+  "reply_amqp_configuration": {
+    "queue": {
+      "name": "reply-to",
+      "declare_options": {
+        "passive": false,
+        "durable": true,
+        "exclusive": false,
+        "auto_delete": true,
+        "nowait": false
+      },
+      "declare_arguments": {}
+    },
+    "consume_options": {
+      "no_local": false,
+      "no_ack": false,
+      "exclusive": false,
+      "nowait": false
+    },
+    "consume_arguments": {}
+  }
+}
