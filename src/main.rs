@@ -1,5 +1,6 @@
 use crate::amqp_connection_manager::AmqpConnectionManager;
-use crate::test_runner::TestRunner;
+use crate::test_suite_result::TestSuiteResult;
+use crate::test_suite_runner::TestSuiteRunner;
 use std::io::{Error, ErrorKind};
 
 mod amqp_connection_manager;
@@ -7,11 +8,13 @@ mod config;
 mod error;
 mod test;
 mod test_reader;
-mod test_request;
 mod test_result;
 mod test_run_instance;
 mod test_run_mode;
-mod test_runner;
+mod test_suite;
+mod test_suite_result;
+mod test_suite_result_output;
+mod test_suite_runner;
 mod test_type;
 mod token_retriever;
 
@@ -65,7 +68,7 @@ async fn main() -> Result<(), Error> {
 
     log::info!("obtained token correctly!");
 
-    let tests = match test_reader::read(&arguments[3..], token.as_str()).await {
+    let test_suites = match test_reader::read(&arguments[3..], token.as_str()).await {
         Ok(tests) => tests,
         Err(error) => {
             return Err(Error::new(
@@ -75,7 +78,7 @@ async fn main() -> Result<(), Error> {
         }
     };
 
-    let tests_lenght = tests.len();
+    let test_suites_length = test_suites.len();
 
     let amqp_connection_manager_config =
         match config::amqp_connection_manager_config::try_generate_config() {
@@ -102,62 +105,51 @@ async fn main() -> Result<(), Error> {
             }
         };
 
-    let (result_sender, mut result_receiver) = tokio::sync::mpsc::channel(1024);
+    let (result_sender, mut result_receiver) = tokio::sync::mpsc::channel::<TestSuiteResult>(1024);
 
     tokio::spawn(async move {
-        for test in tests {
+        for test_suite in test_suites {
             let amqp_channel = match amqp_connection_manager.try_get_channel().await {
                 Ok(amqp_channel) => amqp_channel,
                 Err(error) => {
-                    match result_sender
-                        .send(Err(crate::error::Error::new(
-                            crate::error::ErrorKind::InternalFailure,
-                            format!("failed to get amqp channel: {}", error),
-                        )))
-                        .await
-                    {
-                        Ok(_) => (),
-                        Err(error) => {
-                            log::error!(
-                                "failed to send internal failure to main thread: {}",
-                                error
-                            );
-                            std::process::exit(1);
-                        }
-                    }
-
-                    break;
+                    log::error!("failed to get amqp channel: {}", error);
+                    std::process::exit(1);
                 }
             };
 
-            let test_runner = TestRunner::new(amqp_channel, result_sender.clone());
-
+            let test_runner = TestSuiteRunner::new(amqp_channel, result_sender.clone());
+            let test_name = test_suite.name().to_string();
             tokio::spawn(async move {
-                test_runner.run(test).await;
+                match test_runner.run(test_suite).await {
+                    Ok(()) => (),
+                    Err(error) => {
+                        log::error!("failed to run test suite '{}': {}", test_name, error);
+                        std::process::exit(1);
+                    }
+                }
             });
         }
     });
 
     let mut exit_code = 0;
-    let mut test_count = 0;
+    let mut test_suite_count = 0;
 
     loop {
         let message = match result_receiver.recv().await {
-            Some(message) => match message {
-                Ok(_) => {
-                    test_count += 1;
-                    log::info!("test passed");
+            Some(test_suite_result) => {
+                match test_suite_result_output::output(test_suite_result) {
+                    Ok(()) => (),
+                    Err(error) => {
+                        log::error!("failed to output test suite result: {}", error);
+                        std::process::exit(1);
+                    }
                 }
-                Err(error) => {
-                    test_count += 1;
-                    log::warn!("test failed: {}", error);
-                    exit_code = 1;
-                }
-            },
+                test_suite_count += 1;
+            }
             None => (),
         };
 
-        if test_count >= tests_lenght {
+        if test_suite_count >= test_suites_length {
             break;
         }
     }

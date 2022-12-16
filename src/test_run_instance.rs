@@ -5,29 +5,30 @@ use tokio::sync::mpsc::Sender;
 use crate::{
     config::amqp_instance_config::AmqpInstanceConfig,
     error::{Error, ErrorKind},
-    test_request::TestRequest,
+    test::Test,
+    test_result::TestResult,
 };
 
 pub struct TestRunInstance {
-    test_request: TestRequest,
+    test: Test,
     channel: Channel,
     request_queue_name: String,
     reply_queue_name: String,
     amqp_instance: AmqpInstanceConfig,
-    result_sender: Sender<Result<(), Error>>,
+    result_sender: Sender<TestResult>,
 }
 
 impl TestRunInstance {
     pub fn new(
-        test_request: TestRequest,
+        test_request: Test,
         channel: Channel,
         request_queue_name: String,
         reply_queue_name: String,
         amqp_instance: AmqpInstanceConfig,
-        result_sender: Sender<Result<(), Error>>,
+        result_sender: Sender<TestResult>,
     ) -> TestRunInstance {
         TestRunInstance {
-            test_request,
+            test: test_request,
             channel,
             request_queue_name,
             reply_queue_name,
@@ -46,7 +47,7 @@ impl TestRunInstance {
     }
 
     async fn send_request(self, correlation_id: &str) -> Result<Self, Error> {
-        let request_payload = match serde_json::to_vec(self.test_request.request()) {
+        let request_payload = match serde_json::to_vec(self.test.request()) {
             Ok(request_payload) => request_payload,
             Err(error) => {
                 return Err(Error::new(
@@ -137,9 +138,13 @@ impl TestRunInstance {
                             }
                         };
 
-                    match self.test_request.is_response_equal_to_expected(response) {
+                    match self.test.is_response_equal_to_expected(&response) {
                         true => {
-                            if let Err(error) = self.result_sender.send(Ok(())).await {
+                            if let Err(error) = self
+                                .result_sender
+                                .send(TestResult::new(self.test.name().to_string(), Ok(())))
+                                .await
+                            {
                                 return Err(Error::new(
                                     ErrorKind::InternalFailure,
                                     format!("failed to send result: {}", error),
@@ -149,10 +154,17 @@ impl TestRunInstance {
                         false => {
                             if let Err(error) = self
                                 .result_sender
-                                .send(Err(Error::new(
-                                    ErrorKind::TestAssertFailure,
-                                    "response does not match expected response".to_string(),
-                                )))
+                                .send(TestResult::new(
+                                    self.test.name().to_string(),
+                                    Err(Error::new(
+                                        ErrorKind::TestAssertFailure,
+                                        format!(
+                                            "expected: '{}'; got: '{}'",
+                                            self.test.expected_response(),
+                                            response
+                                        ),
+                                    )),
+                                ))
                                 .await
                             {
                                 return Err(Error::new(

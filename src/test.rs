@@ -1,51 +1,63 @@
-use crate::error::ErrorKind;
-use crate::test_request::TestRequest;
-use crate::test_run_mode::TestRunMode;
-use crate::test_type::TestType;
-use crate::{config::amqp::Amqp, error::Error};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
+
+use crate::error::{Error, ErrorKind};
+
+const REQUEST_HEADER: &str = "header";
+const REQUEST_HEADER_TOKEN: &str = "token";
 
 #[derive(Deserialize, Serialize)]
 pub struct Test {
     name: String,
-    test_type: TestType,
-    run_mode: TestRunMode,
-    requests: Vec<TestRequest>,
-    request_amqp_configuration: Amqp,
-    reply_amqp_configuration: Amqp,
+    request: Map<String, Value>,
+    expected_response: Value,
 }
 
-impl<'a> Test {
+impl Test {
     pub fn name(&self) -> &str {
         self.name.as_str()
     }
 
-    pub fn test_type(&self) -> &TestType {
-        &self.test_type
+    pub fn request(&self) -> &Map<String, Value> {
+        &self.request
     }
 
-    pub fn run_mode(&self) -> &TestRunMode {
-        &self.run_mode
+    pub fn inject_token(&mut self, token: &str) -> Result<(), Error> {
+        let header = match self.request.get_mut(REQUEST_HEADER) {
+            Some(header) => match header.as_object_mut() {
+                Some(header) => header,
+                None => {
+                    return Err(Error::new(
+                        ErrorKind::InternalFailure,
+                        format!("failed to get header as object"),
+                    ));
+                }
+            },
+            None => {
+                return Err(Error::new(
+                    ErrorKind::InternalFailure,
+                    format!("failed to get header"),
+                ));
+            }
+        };
+
+        if header.contains_key(REQUEST_HEADER_TOKEN) {
+            return Ok(());
+        }
+
+        header.insert(
+            REQUEST_HEADER_TOKEN.to_string(),
+            serde_json::Value::String(token.to_string()),
+        );
+
+        Ok(())
     }
 
-    pub fn requests(&self) -> &Vec<TestRequest> {
-        &self.requests
+    pub fn is_response_equal_to_expected(&self, response: &Value) -> bool {
+        self.expected_response == *response
     }
 
-    pub fn mut_requests(&mut self) -> &mut Vec<TestRequest> {
-        &mut self.requests
-    }
-
-    pub fn owned_requests(self) -> Vec<TestRequest> {
-        self.requests
-    }
-
-    pub fn request_amqp_configuration(&self) -> &Amqp {
-        &self.request_amqp_configuration
-    }
-
-    pub fn reply_amqp_configuration(&self) -> &Amqp {
-        &self.reply_amqp_configuration
+    pub fn expected_response(&self) -> &Value {
+        &self.expected_response
     }
 }

@@ -1,0 +1,54 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'cooplan-amqp-api-tester'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=cooplan-amqp-api-tester",
+                    "--package=cooplan-amqp-api-tester"
+                ],
+                "filter": {
+                    "name": "cooplan-amqp-api-tester",
+                    "kind": "bin"
+                }
+            },
+            "args": [
+                "https://simpleg.eu.auth0.com/oauth/token",
+                "{\"client_id\":\"UjT3OHzYmJYeaAy7lWGsVIgyWPhXUxav\",\"client_secret\":\"w9WDhiTQtnieejstWnBaNDz7t0ctZ0Mu5KwlwQTGkPxn76oidLKifHTL1JFX__vQ\",\"audience\":\"marketplace.cooplan\",\"grant_type\":\"client_credentials\"}",
+                "test.json"
+            ],
+            "env": {
+                "AMQP_API_CONNECTION_URI": "amqp://guest:guest@127.0.0.1:5672",
+                "TOKEN_REQUEST_URI": "https://simpleg.eu.auth0.com/oauth/token",
+                "TOKEN_REQUEST_BODY": "{\"client_id\":\"UjT3OHzYmJYeaAy7lWGsVIgyWPhXUxav\",\"client_secret\":\"w9WDhiTQtnieejstWnBaNDz7t0ctZ0Mu5KwlwQTGkPxn76oidLKifHTL1JFX__vQ\",\"audience\":\"marketplace.cooplan\",\"grant_type\":\"client_credentials\"}"
+            },
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'cooplan-amqp-api-tester'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=cooplan-amqp-api-tester",
+                    "--package=cooplan-amqp-api-tester"
+                ],
+                "filter": {
+                    "name": "cooplan-amqp-api-tester",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}
