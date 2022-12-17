@@ -17,28 +17,26 @@ use tokio::sync::mpsc::Sender;
 use uuid::Uuid;
 
 pub struct TestSuiteRunner {
-    channel: Channel,
+    amqp_connection_manager: Arc<AmqpConnectionManager>,
     test_suite_result_sender: Sender<TestSuiteResult>,
 }
 
 impl TestSuiteRunner {
     pub fn new(
-        channel: Channel,
+        amqp_connection_manager: Arc<AmqpConnectionManager>,
         test_suite_result_sender: Sender<TestSuiteResult>,
     ) -> TestSuiteRunner {
         TestSuiteRunner {
-            channel,
+            amqp_connection_manager,
             test_suite_result_sender,
         }
     }
 
     pub async fn run(&self, test_suite: TestSuite) -> Result<(), Error> {
-        let request_queue = self
-            .initialize_request_queue(&test_suite, &self.channel)
-            .await?;
-        let reply_queue = self
-            .initialize_reply_queue(&test_suite, &self.channel)
-            .await?;
+        let channel = self.amqp_connection_manager.try_get_channel().await?;
+
+        let request_queue = self.initialize_request_queue(&test_suite, &channel).await?;
+        let reply_queue = self.initialize_reply_queue(&test_suite, &channel).await?;
 
         let mode = test_suite.run_mode();
 
@@ -143,12 +141,14 @@ impl TestSuiteRunner {
         let test_suite_name = test_suite.name().to_string();
         let tests = test_suite.owned_tests();
 
+        let channel = self.amqp_connection_manager.try_get_channel().await?;
+
         log::info!("# running test suite '{}' sequentially #", test_suite_name);
 
         for test in tests {
             let test_run_instance = TestRunInstance::new(
                 test,
-                self.channel.clone(),
+                channel.clone(),
                 request_queue.name().to_string(),
                 reply_queue.name().to_string(),
                 amqp_instance_config.clone(),
@@ -177,24 +177,23 @@ impl TestSuiteRunner {
 
         log::info!("# running test suite '{}' parallelly #", test_suite_name);
 
-        let mut test_tasks = Vec::new();
-
         for test in tests {
             let test_suite_name_clone = test_suite_name.clone();
             let test_name = test.name().to_string();
+            let channel = self.amqp_connection_manager.try_get_channel().await?;
 
             let test_run_instance = TestRunInstance::new(
                 test,
-                self.channel.clone(),
+                channel,
                 request_queue.name().to_string(),
                 reply_queue.name().to_string(),
                 amqp_instance_config.clone(),
                 result_sender.clone(),
             );
 
-            test_tasks.push(tokio::spawn(async move {
+            tokio::spawn(async move {
                 match test_run_instance.run().await {
-                    Ok(_) => (),
+                    Ok(_) => log::info!("test '{}' run instance finished", test_name),
                     Err(error) => {
                         log::error!(
                             "[{}] test '{}' run instance failed: {}",
@@ -204,19 +203,7 @@ impl TestSuiteRunner {
                         );
                     }
                 }
-            }));
-        }
-
-        for test_task in test_tasks {
-            match test_task.await {
-                Ok(_) => (),
-                Err(error) => {
-                    return Err(Error::new(
-                        ErrorKind::InternalFailure,
-                        format!("test task failed: {}", error),
-                    ));
-                }
-            }
+            });
         }
 
         Ok(())

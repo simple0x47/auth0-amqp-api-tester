@@ -1,7 +1,10 @@
 use crate::amqp_connection_manager::AmqpConnectionManager;
 use crate::test_suite_result::TestSuiteResult;
 use crate::test_suite_runner::TestSuiteRunner;
-use std::io::{Error, ErrorKind};
+use std::{
+    io::{Error, ErrorKind},
+    sync::Arc,
+};
 
 mod amqp_connection_manager;
 mod config;
@@ -96,7 +99,7 @@ async fn main() -> Result<(), Error> {
 
     let amqp_connection_manager =
         match AmqpConnectionManager::try_new(amqp_connection_manager_config).await {
-            Ok(amqp_connection_manager) => amqp_connection_manager,
+            Ok(amqp_connection_manager) => Arc::new(amqp_connection_manager),
             Err(error) => {
                 return Err(Error::new(
                     ErrorKind::Other,
@@ -109,15 +112,8 @@ async fn main() -> Result<(), Error> {
 
     tokio::spawn(async move {
         for test_suite in test_suites {
-            let amqp_channel = match amqp_connection_manager.try_get_channel().await {
-                Ok(amqp_channel) => amqp_channel,
-                Err(error) => {
-                    log::error!("failed to get amqp channel: {}", error);
-                    std::process::exit(1);
-                }
-            };
-
-            let test_runner = TestSuiteRunner::new(amqp_channel, result_sender.clone());
+            let test_runner =
+                TestSuiteRunner::new(amqp_connection_manager.clone(), result_sender.clone());
             let test_name = test_suite.name().to_string();
             tokio::spawn(async move {
                 match test_runner.run(test_suite).await {
