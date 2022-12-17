@@ -1,10 +1,10 @@
 {
-  "name": "syntax",
+  "name": "demand api",
   "test_type": "Single",
-  "run_mode": "Sequential",
-  "requests": [
+  "run_mode": "Parallel",
+  "tests": [
     {
-      "name": "Empty request body & request header",
+      "name": "empty request body & request header",
       "request": {
         "header": {
           "token": "",
@@ -17,6 +17,38 @@
           "kind": "MalformedRequest",
           "message": "request sanitization failure: invalid action detected: "
         }
+      }
+    },
+    {
+      "name": "empty request body",
+      "request": {
+        "header": {
+          "element": "demand",
+          "action": "create"
+        }
+      },
+      "expected_response": {
+        "Err": {
+          "kind": "MalformedRequest",
+          "message": "request sanitization failure: invalid action detected: "
+        }
+      }
+    },
+    {
+      "name": "correct request",
+      "request": {
+        "header": {
+          "element": "demand",
+          "action": "create"
+        },
+        "creator": "simple",
+        "organization": "simpleg",
+        "end_product": {
+          "value": 44321
+        }
+      },
+      "expected_response": {
+        "Ok": null
       }
     }
   ],
@@ -40,12 +72,12 @@
   },
   "reply_amqp_configuration": {
     "queue": {
-      "name": "reply-to",
+      "name": "",
       "declare_options": {
         "passive": false,
-        "durable": true,
-        "exclusive": false,
-        "auto_delete": true,
+        "durable": false,
+        "exclusive": true,
+        "auto_delete": false,
         "nowait": false
       },
       "declare_arguments": {}
