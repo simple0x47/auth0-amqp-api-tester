@@ -133,6 +133,10 @@ async fn main() -> Result<(), Error> {
     loop {
         let message = match result_receiver.recv().await {
             Some(test_suite_result) => {
+                if test_suite_result.has_any_test_failed() {
+                    exit_code = 1;
+                }
+
                 match test_suite_result_output::output(test_suite_result) {
                     Ok(()) => (),
                     Err(error) => {

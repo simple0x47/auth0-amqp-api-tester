@@ -42,4 +42,8 @@ impl TestSuiteResult {
             }
         }
     }
+
+    pub fn has_any_test_failed(&self) -> bool {
+        self.results.iter().any(|result| result.result().is_err())
+    }
 }
