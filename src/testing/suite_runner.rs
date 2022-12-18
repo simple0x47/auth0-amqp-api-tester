@@ -197,7 +197,6 @@ impl TestSuiteRunner {
             test_suite.request_amqp_configuration(),
             test_suite.reply_amqp_configuration(),
         )?;
-        let test_suite_name = test_suite.name().to_string();
         let tests = test_suite.shared_tests();
 
         let channel = self.amqp_connection_manager.try_get_channel().await?;

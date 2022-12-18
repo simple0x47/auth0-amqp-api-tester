@@ -124,7 +124,7 @@ async fn main() -> Result<(), Error> {
     let mut test_suite_count = 0;
 
     loop {
-        let message = match result_receiver.recv().await {
+        match result_receiver.recv().await {
             Some(test_suite_result) => {
                 if test_suite_result.has_any_test_failed() {
                     exit_code = 1;

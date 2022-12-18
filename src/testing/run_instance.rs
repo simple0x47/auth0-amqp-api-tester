@@ -43,7 +43,7 @@ impl RunInstance {
         let correlation_id = uuid::Uuid::new_v4().to_string();
 
         self = self.send_request(correlation_id.as_str()).await?;
-        self = self.get_reply(correlation_id.as_str()).await?;
+        self.get_reply(correlation_id.as_str()).await?;
 
         Ok(())
     }
