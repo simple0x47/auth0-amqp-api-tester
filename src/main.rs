@@ -108,15 +108,16 @@ async fn main() -> Result<(), Error> {
             }
         };
 
-    let (result_sender, mut result_receiver) = tokio::sync::mpsc::channel::<TestSuiteResult>(1024);
+    let (result_sender, mut result_receiver) = tokio::sync::mpsc::channel::<TestSuiteResult>(4096);
 
     tokio::spawn(async move {
         for test_suite in test_suites {
-            let test_runner =
+            let mut test_runner =
                 TestSuiteRunner::new(amqp_connection_manager.clone(), result_sender.clone());
             let test_name = test_suite.name().to_string();
+
             tokio::spawn(async move {
-                match test_runner.run(test_suite).await {
+                match test_runner.execute(test_suite).await {
                     Ok(()) => (),
                     Err(error) => {
                         log::error!("failed to run test suite '{}': {}", test_name, error);

@@ -1,6 +1,10 @@
 {
   "name": "demand api",
-  "test_type": "Single",
+  "test_type": {
+    "Stress": {
+      "times": 512
+    }
+  },
   "run_mode": "Parallel",
   "tests": [
     {
@@ -76,7 +80,7 @@
       "declare_options": {
         "passive": false,
         "durable": false,
-        "exclusive": true,
+        "exclusive": false,
         "auto_delete": false,
         "nowait": false
       },

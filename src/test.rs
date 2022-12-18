@@ -6,7 +6,7 @@ use crate::error::{Error, ErrorKind};
 const REQUEST_HEADER: &str = "header";
 const REQUEST_HEADER_TOKEN: &str = "token";
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct Test {
     name: String,
     request: Map<String, Value>,

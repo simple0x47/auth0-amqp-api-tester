@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::error::ErrorKind;
 use crate::test::Test;
 use crate::test_run_mode::TestRunMode;
@@ -14,6 +16,9 @@ pub struct TestSuite {
     tests: Vec<Test>,
     request_amqp_configuration: Amqp,
     reply_amqp_configuration: Amqp,
+
+    #[serde(skip)]
+    shared_tests: Vec<Arc<Test>>,
 }
 
 impl<'a> TestSuite {
@@ -21,8 +26,8 @@ impl<'a> TestSuite {
         self.name.as_str()
     }
 
-    pub fn test_type(&self) -> &TestType {
-        &self.test_type
+    pub fn test_type(&self) -> TestType {
+        self.test_type
     }
 
     pub fn run_mode(&self) -> &TestRunMode {
@@ -30,7 +35,14 @@ impl<'a> TestSuite {
     }
 
     pub fn test_count(&self) -> usize {
-        self.tests.len()
+        match self.test_type {
+            TestType::Assert => self.tests.len(),
+            TestType::Stress { times } => self.tests.len() * times,
+        }
+    }
+
+    pub fn tests(&self) -> &Vec<Test> {
+        &self.tests
     }
 
     pub fn mut_tests(&mut self) -> &mut Vec<Test> {
@@ -39,6 +51,17 @@ impl<'a> TestSuite {
 
     pub fn owned_tests(self) -> Vec<Test> {
         self.tests
+    }
+
+    pub fn shared_tests(&mut self) -> &[Arc<Test>] {
+        if self.shared_tests.is_empty() {
+            for test in &self.tests {
+                let shared_test = Arc::new(test.clone());
+                self.shared_tests.push(shared_test);
+            }
+        }
+
+        self.shared_tests.as_slice()
     }
 
     pub fn request_amqp_configuration(&self) -> &Amqp {

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone, Copy)]
 pub enum TestType {
-    Single,
-    Stress { tasks: u32, requests: u32 }
+    Assert,
+    Stress { times: usize },
 }

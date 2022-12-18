@@ -1,24 +1,25 @@
+use std::pin::Pin;
 use std::sync::Arc;
 
-use crate::amqp_connection_manager::{self, AmqpConnectionManager};
-use crate::config::amqp_instance_config::{self, AmqpInstanceConfig};
+use crate::amqp_connection_manager::AmqpConnectionManager;
+use crate::config::amqp_instance_config::{self};
 use crate::error::{Error, ErrorKind};
-use crate::test::Test;
 use crate::test_result::TestResult;
 use crate::test_run_instance::TestRunInstance;
 use crate::test_run_mode::TestRunMode;
 use crate::test_suite::TestSuite;
 use crate::test_suite_result::TestSuiteResult;
-use futures_util::TryStreamExt;
-use lapin::options::{BasicAckOptions, BasicPublishOptions};
-use lapin::types::ShortString;
-use lapin::{BasicProperties, Channel, Consumer, Queue};
+use crate::test_type::TestType;
+use futures_util::stream::FuturesUnordered;
+use futures_util::Future;
+use lapin::options::QueueDeleteOptions;
+use lapin::{Channel, Queue};
 use tokio::sync::mpsc::Sender;
-use uuid::Uuid;
 
 pub struct TestSuiteRunner {
     amqp_connection_manager: Arc<AmqpConnectionManager>,
     test_suite_result_sender: Sender<TestSuiteResult>,
+    test_tasks: FuturesUnordered<Pin<Box<dyn Future<Output = ()> + Send + Sync>>>,
 }
 
 impl TestSuiteRunner {
@@ -29,36 +30,67 @@ impl TestSuiteRunner {
         TestSuiteRunner {
             amqp_connection_manager,
             test_suite_result_sender,
+            test_tasks: FuturesUnordered::new(),
         }
     }
 
-    pub async fn run(&self, test_suite: TestSuite) -> Result<(), Error> {
+    pub async fn execute(&mut self, mut test_suite: TestSuite) -> Result<(), Error> {
         let channel = self.amqp_connection_manager.try_get_channel().await?;
 
         let request_queue = self.initialize_request_queue(&test_suite, &channel).await?;
         let reply_queue = self.initialize_reply_queue(&test_suite, &channel).await?;
 
-        let mode = test_suite.run_mode();
+        let test_type = test_suite.test_type();
 
-        let (result_sender, result_receiver) = tokio::sync::mpsc::channel(1024);
+        let (result_sender, result_receiver) = tokio::sync::mpsc::channel(4096);
+
+        match test_type {
+            TestType::Assert => {
+                self.run(
+                    &mut test_suite,
+                    &request_queue,
+                    &reply_queue,
+                    &result_sender,
+                )
+                .await?
+            }
+            TestType::Stress { times } => {
+                for time in 0..times {
+                    match self
+                        .run(
+                            &mut test_suite,
+                            &request_queue,
+                            &reply_queue,
+                            &result_sender,
+                        )
+                        .await
+                    {
+                        Ok(_) => log::info!("run finished successfully #{}", time),
+                        Err(error) => log::error!("run failed #{} : {}", time, error),
+                    }
+                }
+
+                for future in self.test_tasks.iter_mut() {
+                    future.await;
+                }
+            }
+        }
+
         let mut test_suite_result = TestSuiteResult::new(
             test_suite.name().to_string(),
             test_suite.test_count(),
             result_receiver,
         );
 
-        match mode {
-            TestRunMode::Sequential => {
-                self.run_sequentially(test_suite, &request_queue, &reply_queue, &result_sender)
-                    .await?;
-            }
-            TestRunMode::Parallel => {
-                self.run_parallelly(test_suite, &request_queue, &reply_queue, &result_sender)
-                    .await?;
-            }
-        }
-
         test_suite_result.collect_results().await;
+
+        match channel
+            .queue_delete(reply_queue.name().as_str(), QueueDeleteOptions::default())
+            .await
+        {
+            Ok(_) => (),
+            Err(error) => log::error!("failed to delete reply queue: {}", error),
+        }
 
         match self.test_suite_result_sender.send(test_suite_result).await {
             Ok(_) => {}
@@ -127,9 +159,32 @@ impl TestSuiteRunner {
         Ok(reply_queue)
     }
 
+    async fn run(
+        &mut self,
+        test_suite: &mut TestSuite,
+        request_queue: &Queue,
+        reply_queue: &Queue,
+        result_sender: &Sender<TestResult>,
+    ) -> Result<(), Error> {
+        let mode = test_suite.run_mode();
+
+        match mode {
+            TestRunMode::Sequential => {
+                self.run_sequentially(test_suite, &request_queue, &reply_queue, &result_sender)
+                    .await?;
+            }
+            TestRunMode::Parallel => {
+                self.run_parallelly(test_suite, &request_queue, &reply_queue, &result_sender)
+                    .await?;
+            }
+        }
+
+        Ok(())
+    }
+
     async fn run_sequentially(
         &self,
-        test_suite: TestSuite,
+        test_suite: &mut TestSuite,
         request_queue: &Queue,
         reply_queue: &Queue,
         result_sender: &Sender<TestResult>,
@@ -139,15 +194,13 @@ impl TestSuiteRunner {
             test_suite.reply_amqp_configuration(),
         )?;
         let test_suite_name = test_suite.name().to_string();
-        let tests = test_suite.owned_tests();
+        let tests = test_suite.shared_tests();
 
         let channel = self.amqp_connection_manager.try_get_channel().await?;
 
-        log::info!("# running test suite '{}' sequentially #", test_suite_name);
-
         for test in tests {
             let test_run_instance = TestRunInstance::new(
-                test,
+                test.clone(),
                 channel.clone(),
                 request_queue.name().to_string(),
                 reply_queue.name().to_string(),
@@ -162,8 +215,8 @@ impl TestSuiteRunner {
     }
 
     async fn run_parallelly(
-        &self,
-        test_suite: TestSuite,
+        &mut self,
+        test_suite: &mut TestSuite,
         request_queue: &Queue,
         reply_queue: &Queue,
         result_sender: &Sender<TestResult>,
@@ -173,9 +226,7 @@ impl TestSuiteRunner {
             test_suite.reply_amqp_configuration(),
         )?;
         let test_suite_name = Arc::new(test_suite.name().to_string());
-        let tests = test_suite.owned_tests();
-
-        log::info!("# running test suite '{}' parallelly #", test_suite_name);
+        let tests = test_suite.shared_tests();
 
         for test in tests {
             let test_suite_name_clone = test_suite_name.clone();
@@ -183,7 +234,7 @@ impl TestSuiteRunner {
             let channel = self.amqp_connection_manager.try_get_channel().await?;
 
             let test_run_instance = TestRunInstance::new(
-                test,
+                test.clone(),
                 channel,
                 request_queue.name().to_string(),
                 reply_queue.name().to_string(),
@@ -191,7 +242,7 @@ impl TestSuiteRunner {
                 result_sender.clone(),
             );
 
-            tokio::spawn(async move {
+            self.test_tasks.push(Box::pin(async move {
                 match test_run_instance.run().await {
                     Ok(_) => log::info!("test '{}' run instance finished", test_name),
                     Err(error) => {
@@ -203,7 +254,7 @@ impl TestSuiteRunner {
                         );
                     }
                 }
-            });
+            }));
         }
 
         Ok(())

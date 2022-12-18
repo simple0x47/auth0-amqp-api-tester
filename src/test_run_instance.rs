@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use futures_util::TryStreamExt;
 use lapin::{BasicProperties, Channel};
 use tokio::sync::mpsc::Sender;
@@ -10,7 +12,7 @@ use crate::{
 };
 
 pub struct TestRunInstance {
-    test: Test,
+    test: Arc<Test>,
     channel: Channel,
     request_queue_name: String,
     reply_queue_name: String,
@@ -20,15 +22,15 @@ pub struct TestRunInstance {
 
 impl TestRunInstance {
     pub fn new(
-        test_request: Test,
+        test: Arc<Test>,
         channel: Channel,
         request_queue_name: String,
         reply_queue_name: String,
         amqp_instance: AmqpInstanceConfig,
         result_sender: Sender<TestResult>,
-    ) -> TestRunInstance {
+    ) -> Self {
         TestRunInstance {
-            test: test_request,
+            test,
             channel,
             request_queue_name,
             reply_queue_name,
