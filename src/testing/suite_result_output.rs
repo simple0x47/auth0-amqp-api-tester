@@ -1,8 +1,9 @@
-use crate::{error::Error, test_suite_result::TestSuiteResult};
+use crate::error::Error;
+use crate::testing::suite_result::SuiteResult;
 
-pub fn output(test_suite_result: TestSuiteResult) -> Result<(), Error> {
-    log::info!("# test suite '{}' results #", test_suite_result.name());
-    let test_results = test_suite_result.results();
+pub fn output(suite_result: SuiteResult) -> Result<(), Error> {
+    log::info!("# test suite '{}' results #", suite_result.name());
+    let test_results = suite_result.results();
 
     for test_result in test_results {
         match test_result.result() {

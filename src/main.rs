@@ -1,25 +1,17 @@
 use crate::amqp_connection_manager::AmqpConnectionManager;
-use crate::test_suite_result::TestSuiteResult;
-use crate::test_suite_runner::TestSuiteRunner;
 use std::{
     io::{Error, ErrorKind},
     sync::Arc,
 };
+use crate::testing::suite_result::SuiteResult;
+use crate::testing::{suite_reader, suite_result_output};
+use crate::testing::suite_runner::TestSuiteRunner;
 
 mod amqp_connection_manager;
 mod config;
 mod error;
-mod test;
-mod test_reader;
-mod test_result;
-mod test_run_instance;
-mod test_run_mode;
-mod test_suite;
-mod test_suite_result;
-mod test_suite_result_output;
-mod test_suite_runner;
-mod test_type;
 mod token_retriever;
+mod testing;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -71,7 +63,7 @@ async fn main() -> Result<(), Error> {
 
     log::info!("obtained token correctly!");
 
-    let test_suites = match test_reader::read(&arguments[3..], token.as_str()).await {
+    let test_suites = match suite_reader::read(&arguments[3..], token.as_str()).await {
         Ok(tests) => tests,
         Err(error) => {
             return Err(Error::new(
@@ -108,7 +100,7 @@ async fn main() -> Result<(), Error> {
             }
         };
 
-    let (result_sender, mut result_receiver) = tokio::sync::mpsc::channel::<TestSuiteResult>(4096);
+    let (result_sender, mut result_receiver) = tokio::sync::mpsc::channel::<SuiteResult>(4096);
 
     tokio::spawn(async move {
         for test_suite in test_suites {
@@ -138,7 +130,7 @@ async fn main() -> Result<(), Error> {
                     exit_code = 1;
                 }
 
-                match test_suite_result_output::output(test_suite_result) {
+                match suite_result_output::output(test_suite_result) {
                     Ok(()) => (),
                     Err(error) => {
                         log::error!("failed to output test suite result: {}", error);

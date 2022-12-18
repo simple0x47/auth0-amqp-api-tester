@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
-pub enum TestRunMode {
+pub enum RunMode {
     Sequential,
     Parallel,
 }

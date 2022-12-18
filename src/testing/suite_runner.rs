@@ -4,21 +4,21 @@ use std::sync::Arc;
 use crate::amqp_connection_manager::AmqpConnectionManager;
 use crate::config::amqp_instance_config::{self};
 use crate::error::{Error, ErrorKind};
-use crate::test_result::TestResult;
-use crate::test_run_instance::TestRunInstance;
-use crate::test_run_mode::TestRunMode;
-use crate::test_suite::TestSuite;
-use crate::test_suite_result::TestSuiteResult;
-use crate::test_type::TestType;
 use futures_util::stream::FuturesUnordered;
 use futures_util::Future;
 use lapin::options::QueueDeleteOptions;
 use lapin::{Channel, Queue};
 use tokio::sync::mpsc::Sender;
+use crate::testing::test_result::TestResult;
+use crate::testing::run_instance::RunInstance;
+use crate::testing::run_mode::RunMode;
+use crate::testing::suite::Suite;
+use crate::testing::suite_result::SuiteResult;
+use crate::testing::test_type::TestType;
 
 pub struct TestSuiteRunner {
     amqp_connection_manager: Arc<AmqpConnectionManager>,
-    test_suite_result_sender: Sender<TestSuiteResult>,
+    test_suite_result_sender: Sender<SuiteResult>,
     test_tasks: FuturesUnordered<Pin<Box<dyn Future<Output = ()> + Send + Sync>>>,
     stress_mode: bool,
 }
@@ -26,7 +26,7 @@ pub struct TestSuiteRunner {
 impl TestSuiteRunner {
     pub fn new(
         amqp_connection_manager: Arc<AmqpConnectionManager>,
-        test_suite_result_sender: Sender<TestSuiteResult>,
+        test_suite_result_sender: Sender<SuiteResult>,
     ) -> TestSuiteRunner {
         TestSuiteRunner {
             amqp_connection_manager,
@@ -36,7 +36,7 @@ impl TestSuiteRunner {
         }
     }
 
-    pub async fn execute(&mut self, mut test_suite: TestSuite) -> Result<(), Error> {
+    pub async fn execute(&mut self, mut test_suite: Suite) -> Result<(), Error> {
         let channel = self.amqp_connection_manager.try_get_channel().await?;
 
         let request_queue = self.initialize_request_queue(&test_suite, &channel).await?;
@@ -80,7 +80,7 @@ impl TestSuiteRunner {
             }
         }
 
-        let mut test_suite_result = TestSuiteResult::new(
+        let mut test_suite_result = SuiteResult::new(
             test_suite.name().to_string(),
             test_suite.test_count(),
             result_receiver,
@@ -111,7 +111,7 @@ impl TestSuiteRunner {
 
     async fn initialize_request_queue(
         &self,
-        test: &TestSuite,
+        test: &Suite,
         channel: &Channel,
     ) -> Result<Queue, Error> {
         let request_queue_config = test.request_amqp_configuration().queue();
@@ -138,7 +138,7 @@ impl TestSuiteRunner {
 
     async fn initialize_reply_queue(
         &self,
-        test: &TestSuite,
+        test: &Suite,
         channel: &Channel,
     ) -> Result<Queue, Error> {
         let reply_queue_config = test.reply_amqp_configuration().queue();
@@ -165,7 +165,7 @@ impl TestSuiteRunner {
 
     async fn run(
         &mut self,
-        test_suite: &mut TestSuite,
+        test_suite: &mut Suite,
         request_queue: &Queue,
         reply_queue: &Queue,
         result_sender: &Sender<TestResult>,
@@ -173,11 +173,11 @@ impl TestSuiteRunner {
         let mode = test_suite.run_mode();
 
         match mode {
-            TestRunMode::Sequential => {
+            RunMode::Sequential => {
                 self.run_sequentially(test_suite, &request_queue, &reply_queue, &result_sender)
                     .await?;
             }
-            TestRunMode::Parallel => {
+            RunMode::Parallel => {
                 self.run_parallelly(test_suite, &request_queue, &reply_queue, &result_sender)
                     .await?;
             }
@@ -188,7 +188,7 @@ impl TestSuiteRunner {
 
     async fn run_sequentially(
         &self,
-        test_suite: &mut TestSuite,
+        test_suite: &mut Suite,
         request_queue: &Queue,
         reply_queue: &Queue,
         result_sender: &Sender<TestResult>,
@@ -203,7 +203,7 @@ impl TestSuiteRunner {
         let channel = self.amqp_connection_manager.try_get_channel().await?;
 
         for test in tests {
-            let test_run_instance = TestRunInstance::new(
+            let test_run_instance = RunInstance::new(
                 test.clone(),
                 channel.clone(),
                 request_queue.name().to_string(),
@@ -220,7 +220,7 @@ impl TestSuiteRunner {
 
     async fn run_parallelly(
         &mut self,
-        test_suite: &mut TestSuite,
+        test_suite: &mut Suite,
         request_queue: &Queue,
         reply_queue: &Queue,
         result_sender: &Sender<TestResult>,
@@ -237,7 +237,7 @@ impl TestSuiteRunner {
             let test_name = test.name().to_string();
             let channel = self.amqp_connection_manager.try_get_channel().await?;
 
-            let test_run_instance = TestRunInstance::new(
+            let test_run_instance = RunInstance::new(
                 test.clone(),
                 channel,
                 request_queue.name().to_string(),

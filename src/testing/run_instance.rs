@@ -7,11 +7,11 @@ use tokio::sync::mpsc::Sender;
 use crate::{
     config::amqp_instance_config::AmqpInstanceConfig,
     error::{Error, ErrorKind},
-    test::Test,
-    test_result::TestResult,
 };
+use crate::testing::test::Test;
+use crate::testing::test_result::TestResult;
 
-pub struct TestRunInstance {
+pub struct RunInstance {
     test: Arc<Test>,
     channel: Channel,
     request_queue_name: String,
@@ -20,7 +20,7 @@ pub struct TestRunInstance {
     result_sender: Sender<TestResult>,
 }
 
-impl TestRunInstance {
+impl RunInstance {
     pub fn new(
         test: Arc<Test>,
         channel: Channel,
@@ -29,7 +29,7 @@ impl TestRunInstance {
         amqp_instance: AmqpInstanceConfig,
         result_sender: Sender<TestResult>,
     ) -> Self {
-        TestRunInstance {
+        RunInstance {
             test,
             channel,
             request_queue_name,

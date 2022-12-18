@@ -1,21 +1,21 @@
 use tokio::sync::mpsc::Receiver;
 
-use crate::test_result::TestResult;
+use crate::testing::test_result::TestResult;
 
-pub struct TestSuiteResult {
+pub struct SuiteResult {
     name: String,
     test_count: usize,
     results: Vec<TestResult>,
     test_result_receiver: Receiver<TestResult>,
 }
 
-impl TestSuiteResult {
+impl SuiteResult {
     pub fn new(
         name: String,
         test_count: usize,
         test_result_receiver: Receiver<TestResult>,
-    ) -> TestSuiteResult {
-        TestSuiteResult {
+    ) -> SuiteResult {
+        SuiteResult {
             name,
             test_count,
             results: Vec::with_capacity(test_count),
