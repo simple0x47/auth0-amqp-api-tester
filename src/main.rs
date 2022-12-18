@@ -5,7 +5,7 @@ use std::{
 };
 use crate::testing::suite_result::SuiteResult;
 use crate::testing::{suite_reader, suite_result_output};
-use crate::testing::suite_runner::TestSuiteRunner;
+use crate::testing::suite_runner::SuiteRunner;
 
 mod amqp_connection_manager;
 mod config;
@@ -105,7 +105,7 @@ async fn main() -> Result<(), Error> {
     tokio::spawn(async move {
         for test_suite in test_suites {
             let mut test_runner =
-                TestSuiteRunner::new(amqp_connection_manager.clone(), result_sender.clone());
+                SuiteRunner::new(amqp_connection_manager.clone(), result_sender.clone());
             let test_name = test_suite.name().to_string();
 
             tokio::spawn(async move {

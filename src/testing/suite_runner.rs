@@ -16,19 +16,19 @@ use crate::testing::suite::Suite;
 use crate::testing::suite_result::SuiteResult;
 use crate::testing::test_type::TestType;
 
-pub struct TestSuiteRunner {
+pub struct SuiteRunner {
     amqp_connection_manager: Arc<AmqpConnectionManager>,
     test_suite_result_sender: Sender<SuiteResult>,
     test_tasks: FuturesUnordered<Pin<Box<dyn Future<Output = ()> + Send + Sync>>>,
     stress_mode: bool,
 }
 
-impl TestSuiteRunner {
+impl SuiteRunner {
     pub fn new(
         amqp_connection_manager: Arc<AmqpConnectionManager>,
         test_suite_result_sender: Sender<SuiteResult>,
-    ) -> TestSuiteRunner {
-        TestSuiteRunner {
+    ) -> SuiteRunner {
+        SuiteRunner {
             amqp_connection_manager,
             test_suite_result_sender,
             test_tasks: FuturesUnordered::new(),
