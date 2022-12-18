@@ -1,9 +1,7 @@
 use std::sync::Arc;
 
-use crate::error::ErrorKind;
-use crate::{config::amqp::Amqp, error::Error};
+use crate::{config::amqp::Amqp};
 use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value};
 use crate::testing::test::Test;
 use crate::testing::run_mode::RunMode;
 use crate::testing::test_type::TestType;
@@ -41,16 +39,8 @@ impl<'a> Suite {
         }
     }
 
-    pub fn tests(&self) -> &Vec<Test> {
-        &self.tests
-    }
-
     pub fn mut_tests(&mut self) -> &mut Vec<Test> {
         &mut self.tests
-    }
-
-    pub fn owned_tests(self) -> Vec<Test> {
-        self.tests
     }
 
     pub fn shared_tests(&mut self) -> &[Arc<Test>] {
