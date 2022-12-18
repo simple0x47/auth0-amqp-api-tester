@@ -1,9 +1,8 @@
 use crate::error::{Error, ErrorKind};
-use crate::test::Test;
-use crate::test_suite::TestSuite;
+use crate::testing::suite::Suite;
 
-pub async fn read(files: &[String], token: &str) -> Result<Vec<TestSuite>, Error> {
-    let mut tests = Vec::<TestSuite>::with_capacity(files.len());
+pub async fn read(files: &[String], token: &str) -> Result<Vec<Suite>, Error> {
+    let mut tests = Vec::<Suite>::with_capacity(files.len());
 
     for file in files {
         let file_content = match tokio::fs::read(format!("./{}", file)).await {
@@ -16,7 +15,7 @@ pub async fn read(files: &[String], token: &str) -> Result<Vec<TestSuite>, Error
             }
         };
 
-        let mut test: TestSuite = match serde_json::from_slice(file_content.as_slice()) {
+        let mut test: Suite = match serde_json::from_slice(file_content.as_slice()) {
             Ok(test) => test,
             Err(error) => {
                 return Err(Error::new(

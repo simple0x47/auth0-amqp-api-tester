@@ -1,18 +1,18 @@
 use std::sync::Arc;
 
 use crate::error::ErrorKind;
-use crate::test::Test;
-use crate::test_run_mode::TestRunMode;
-use crate::test_type::TestType;
 use crate::{config::amqp::Amqp, error::Error};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
+use crate::testing::test::Test;
+use crate::testing::run_mode::RunMode;
+use crate::testing::test_type::TestType;
 
 #[derive(Deserialize, Serialize)]
-pub struct TestSuite {
+pub struct Suite {
     name: String,
     test_type: TestType,
-    run_mode: TestRunMode,
+    run_mode: RunMode,
     tests: Vec<Test>,
     request_amqp_configuration: Amqp,
     reply_amqp_configuration: Amqp,
@@ -21,7 +21,7 @@ pub struct TestSuite {
     shared_tests: Vec<Arc<Test>>,
 }
 
-impl<'a> TestSuite {
+impl<'a> Suite {
     pub fn name(&self) -> &str {
         self.name.as_str()
     }
@@ -30,7 +30,7 @@ impl<'a> TestSuite {
         self.test_type
     }
 
-    pub fn run_mode(&self) -> &TestRunMode {
+    pub fn run_mode(&self) -> &RunMode {
         &self.run_mode
     }
 
