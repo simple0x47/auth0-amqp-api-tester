@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use futures_util::TryStreamExt;
-use lapin::{BasicProperties, Channel};
+use lapin::{options::BasicAckOptions, BasicProperties, Channel};
 use tokio::sync::mpsc::Sender;
 
 use crate::{
@@ -125,6 +125,16 @@ impl TestRunInstance {
                     ))
                 }
             };
+
+            match delivery.ack(BasicAckOptions::default()).await {
+                Ok(_) => (),
+                Err(error) => {
+                    return Err(Error::new(
+                        ErrorKind::InternalFailure,
+                        format!("failed to ack reply: {}", error),
+                    ))
+                }
+            }
 
             if let Some(delivery_correlation_id) = delivery.properties.correlation_id() {
                 if delivery_correlation_id.as_str() == correlation_id {
