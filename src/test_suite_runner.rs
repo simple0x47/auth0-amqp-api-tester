@@ -20,6 +20,7 @@ pub struct TestSuiteRunner {
     amqp_connection_manager: Arc<AmqpConnectionManager>,
     test_suite_result_sender: Sender<TestSuiteResult>,
     test_tasks: FuturesUnordered<Pin<Box<dyn Future<Output = ()> + Send + Sync>>>,
+    stress_mode: bool,
 }
 
 impl TestSuiteRunner {
@@ -31,6 +32,7 @@ impl TestSuiteRunner {
             amqp_connection_manager,
             test_suite_result_sender,
             test_tasks: FuturesUnordered::new(),
+            stress_mode: false,
         }
     }
 
@@ -55,6 +57,8 @@ impl TestSuiteRunner {
                 .await?
             }
             TestType::Stress { times } => {
+                self.stress_mode = true;
+
                 for time in 0..times {
                     match self
                         .run(
@@ -242,7 +246,7 @@ impl TestSuiteRunner {
                 result_sender.clone(),
             );
 
-            self.test_tasks.push(Box::pin(async move {
+            let instance_execution = async move {
                 match test_run_instance.run().await {
                     Ok(_) => log::info!("test '{}' run instance finished", test_name),
                     Err(error) => {
@@ -254,7 +258,13 @@ impl TestSuiteRunner {
                         );
                     }
                 }
-            }));
+            };
+
+            if self.stress_mode {
+                self.test_tasks.push(Box::pin(instance_execution));
+            } else {
+                tokio::spawn(instance_execution);
+            }
         }
 
         Ok(())
