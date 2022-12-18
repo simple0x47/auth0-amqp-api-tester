@@ -1,6 +1,8 @@
 use crate::error::{Error, ErrorKind};
 use crate::testing::suite::Suite;
 
+/// Reads a <b>Suite</b> from a file and proceeds to inject the specified token into the suite,
+/// so the tests can authenticate themselves whenever they make requests to the API.
 pub async fn read(files: &[String], token: &str) -> Result<Vec<Suite>, Error> {
     let mut tests = Vec::<Suite>::with_capacity(files.len());
 

@@ -2,6 +2,7 @@ use tokio::sync::mpsc::Receiver;
 
 use crate::testing::test_result::TestResult;
 
+/// Result that is given by a Suite after every test within it has been executed.
 pub struct SuiteResult {
     name: String,
     test_count: usize,
@@ -27,10 +28,12 @@ impl SuiteResult {
         self.name.as_str()
     }
 
+    /// Returns the results of every test that has been executed.
     pub fn results(&self) -> &[TestResult] {
         self.results.as_slice()
     }
 
+    /// Awaits for each test to send their result.
     pub async fn collect_results(&mut self) {
         loop {
             if let Some(result) = self.test_result_receiver.recv().await {

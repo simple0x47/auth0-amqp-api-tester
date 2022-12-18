@@ -6,6 +6,7 @@ use crate::testing::test::Test;
 use crate::testing::run_mode::RunMode;
 use crate::testing::test_type::TestType;
 
+/// A container of tests.
 #[derive(Deserialize, Serialize)]
 pub struct Suite {
     name: String,

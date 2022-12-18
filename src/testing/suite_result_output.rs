@@ -1,6 +1,7 @@
 use crate::error::Error;
 use crate::testing::suite_result::SuiteResult;
 
+/// Outputs the test suite results into an useful format.
 pub fn output(suite_result: SuiteResult) -> Result<(), Error> {
     log::info!("# test suite '{}' results #", suite_result.name());
     let test_results = suite_result.results();

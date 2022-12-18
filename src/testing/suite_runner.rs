@@ -16,6 +16,7 @@ use crate::testing::suite::Suite;
 use crate::testing::suite_result::SuiteResult;
 use crate::testing::test_type::TestType;
 
+/// Executes test suites appropriately depending on their run mode and test type.
 pub struct SuiteRunner {
     amqp_connection_manager: Arc<AmqpConnectionManager>,
     test_suite_result_sender: Sender<SuiteResult>,
@@ -36,6 +37,8 @@ impl SuiteRunner {
         }
     }
 
+    /// Executes the given test suite and then proceeds to send a SuiteResult through the result sender.
+    /// Error is returned in case of runtime errors instead of test related ones.
     pub async fn execute(&mut self, mut test_suite: Suite) -> Result<(), Error> {
         let channel = self.amqp_connection_manager.try_get_channel().await?;
 

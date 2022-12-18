@@ -11,6 +11,7 @@ use crate::{
 use crate::testing::test::Test;
 use crate::testing::test_result::TestResult;
 
+/// A single test instance that is run by the SuiteRunner.
 pub struct RunInstance {
     test: Arc<Test>,
     channel: Channel,
