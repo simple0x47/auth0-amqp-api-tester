@@ -31,6 +31,11 @@ async fn main() -> Result<(), Error> {
         return Err(Error::new(ErrorKind::InvalidInput, "no test file provided"));
     }
 
+    log::info!("# executing tester with the following arguments #");
+    for argument in arguments.as_slice() {
+        log::info!("\t-> {}", argument);
+    }
+
     let token_request_uri = match arguments.get(1) {
         Some(token_request_uri) => token_request_uri.to_string(),
         None => {
