@@ -1,17 +1,17 @@
 use crate::amqp_connection_manager::AmqpConnectionManager;
+use crate::testing::suite_result::SuiteResult;
+use crate::testing::suite_runner::SuiteRunner;
+use crate::testing::{suite_reader, suite_result_output};
 use std::{
     io::{Error, ErrorKind},
     sync::Arc,
 };
-use crate::testing::suite_result::SuiteResult;
-use crate::testing::{suite_reader, suite_result_output};
-use crate::testing::suite_runner::SuiteRunner;
 
 mod amqp_connection_manager;
 mod config;
 mod error;
-mod token_retriever;
 mod testing;
+mod token_retriever;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -35,8 +35,6 @@ async fn main() -> Result<(), Error> {
     for argument in arguments.as_slice() {
         log::info!("\t-> {}", argument);
     }
-
-
 
     let token_request_uri = match arguments.get(1) {
         Some(token_request_uri) => token_request_uri.to_string(),
