@@ -7,7 +7,7 @@ pub async fn read(files: &[&str], token: &str) -> Result<Vec<Suite>, Error> {
     let mut tests = Vec::<Suite>::with_capacity(files.len());
 
     for file in files {
-        let file_content = match tokio::fs::read(format!("./{}", file)).await {
+        let file_content = match tokio::fs::read(format!("{}", file)).await {
             Ok(file_content) => file_content,
             Err(error) => {
                 return Err(Error::new(
