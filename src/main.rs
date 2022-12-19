@@ -27,7 +27,7 @@ async fn main() -> Result<(), Error> {
 
     let arguments: Vec<String> = std::env::args().collect();
 
-    if arguments.len() < 3 {
+    if arguments.len() != 4 {
         return Err(Error::new(ErrorKind::InvalidInput, "no test file provided"));
     }
 
@@ -35,6 +35,8 @@ async fn main() -> Result<(), Error> {
     for argument in arguments.as_slice() {
         log::info!("\t-> {}", argument);
     }
+
+
 
     let token_request_uri = match arguments.get(1) {
         Some(token_request_uri) => token_request_uri.to_string(),
@@ -68,7 +70,8 @@ async fn main() -> Result<(), Error> {
 
     log::info!("obtained token correctly!");
 
-    let test_suites = match suite_reader::read(&arguments[3..], token.as_str()).await {
+    let test_suite_files = arguments.get(3)?.split_whitespace().collect::<Vec<String>>();
+    let test_suites = match suite_reader::read(test_suite_files.as_slice(), token.as_str()).await {
         Ok(tests) => tests,
         Err(error) => {
             return Err(Error::new(
