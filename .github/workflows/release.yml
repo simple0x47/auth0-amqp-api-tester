@@ -39,6 +39,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./target/release/cooplan-definitions-validator
-        asset_name: cooplan-amqp-api-validator
+        asset_path: ./target/release/cooplan-amqp-api-tester
+        asset_name: cooplan-amqp-api-tester
         asset_content_type: application/x-elf
