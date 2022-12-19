@@ -70,7 +70,16 @@ async fn main() -> Result<(), Error> {
 
     log::info!("obtained token correctly!");
 
-    let test_suite_files = arguments.get(3)?.split_whitespace().collect::<Vec<String>>();
+    let test_suite_files = match arguments.get(3) {
+        Some(test_suite_files) => test_suite_files.split(':').collect::<Vec<&str>>(),
+        None => {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "no test suite files provided",
+            ));
+        }
+    };
+
     let test_suites = match suite_reader::read(test_suite_files.as_slice(), token.as_str()).await {
         Ok(tests) => tests,
         Err(error) => {
