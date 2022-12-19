@@ -1,0 +1,43 @@
+name: Release
+
+on:
+  push:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    - uses: actions/checkout@v3
+    - name: Run tests
+      run: cargo test --verbose
+    - name: Build
+      run: cargo build --release --verbose
+    - name: Create release tag
+      id: create_release_tag
+      run: |
+        echo ::set-output name=tag_name::"inc.$GITHUB_RUN_NUMBER"
+    - name: Create release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.create_release_tag.outputs.tag_name }}
+        release_name: ${{ env.GITHUB_RUN_NUMBER }}
+        body: ${{ github.event.head_commit.message }}
+        draft: false
+        prerelease: false
+    - name: Upload executable
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./target/release/cooplan-definitions-validator
+        asset_name: cooplan-amqp-api-validator
+        asset_content_type: application/x-elf
