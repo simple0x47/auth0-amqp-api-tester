@@ -117,23 +117,21 @@ async fn main() -> Result<(), Error> {
 
     let (result_sender, mut result_receiver) = tokio::sync::mpsc::channel::<SuiteResult>(4096);
 
-    tokio::spawn(async move {
-        for test_suite in test_suites {
-            let mut test_runner =
-                SuiteRunner::new(amqp_connection_manager.clone(), result_sender.clone());
-            let test_name = test_suite.name().to_string();
+    for test_suite in test_suites {
+        let mut test_runner =
+            SuiteRunner::new(amqp_connection_manager.clone(), result_sender.clone());
+        let test_name = test_suite.name().to_string();
 
-            tokio::spawn(async move {
-                match test_runner.execute(test_suite).await {
-                    Ok(()) => (),
-                    Err(error) => {
-                        log::error!("failed to run test suite '{}': {}", test_name, error);
-                        std::process::exit(1);
-                    }
+        tokio::spawn(async move {
+            match test_runner.execute(test_suite).await {
+                Ok(()) => (),
+                Err(error) => {
+                    log::error!("failed to run test suite '{}': {}", test_name, error);
+                    std::process::exit(1);
                 }
-            });
-        }
-    });
+            }
+        });
+    }
 
     let mut exit_code = 0;
     let mut test_suite_count = 0;

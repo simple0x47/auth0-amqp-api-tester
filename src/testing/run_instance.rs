@@ -56,6 +56,8 @@ impl RunInstance {
     }
 
     async fn send_request(self, correlation_id: &str) -> Result<Self, Error> {
+        log::info!("[{}] sending request with correlation_id: {}", self.test.name(), correlation_id);
+
         let request_payload = match serde_json::to_vec(self.test.request()) {
             Ok(request_payload) => request_payload,
             Err(error) => {
@@ -95,6 +97,8 @@ impl RunInstance {
     }
 
     async fn get_reply(self, correlation_id: &str) -> Result<Self, Error> {
+        log::info!("[{}] getting reply for correlation id: {}", self.test.name(), correlation_id);
+
         let consumer_tag = format!("{}#{}", &self.reply_queue_name, uuid::Uuid::new_v4());
 
         let mut consumer = match self
@@ -117,6 +121,8 @@ impl RunInstance {
         };
 
         loop {
+            log::info!("[{}] trying to get next delivery", self.test.name());
+
             let delivery = match consumer.try_next().await {
                 Ok(Some(delivery)) => delivery,
                 Ok(None) => {
@@ -132,6 +138,8 @@ impl RunInstance {
                     ))
                 }
             };
+
+            log::info!("[{}] received delivery", self.test.name());
 
             match delivery.ack(BasicAckOptions::default()).await {
                 Ok(_) => (),

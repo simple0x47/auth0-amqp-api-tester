@@ -9,6 +9,7 @@ use futures_util::Future;
 use lapin::options::QueueDeleteOptions;
 use lapin::{Channel, Queue};
 use tokio::sync::mpsc::Sender;
+use crate::config::amqp_queue::AmqpQueue;
 use crate::testing::assert_script_runner::AssertScriptRunner;
 use crate::testing::test_result::TestResult;
 use crate::testing::run_instance::RunInstance;
@@ -44,7 +45,6 @@ impl SuiteRunner {
         let channel = self.amqp_connection_manager.try_get_channel().await?;
 
         let request_queue = self.initialize_request_queue(&test_suite, &channel).await?;
-        let reply_queue = self.initialize_reply_queue(&test_suite, &channel).await?;
 
         let test_type = test_suite.test_type();
 
@@ -55,7 +55,7 @@ impl SuiteRunner {
                 self.run(
                     &mut test_suite,
                     &request_queue,
-                    &reply_queue,
+                    &channel,
                     &result_sender,
                 )
                 .await?
@@ -68,7 +68,7 @@ impl SuiteRunner {
                         .run(
                             &mut test_suite,
                             &request_queue,
-                            &reply_queue,
+                            &channel,
                             &result_sender,
                         )
                         .await
@@ -91,14 +91,6 @@ impl SuiteRunner {
         );
 
         test_suite_result.collect_results().await;
-
-        match channel
-            .queue_delete(reply_queue.name().as_str(), QueueDeleteOptions::default())
-            .await
-        {
-            Ok(_) => (),
-            Err(error) => log::error!("failed to delete reply queue: {}", error),
-        }
 
         match self.test_suite_result_sender.send(test_suite_result).await {
             Ok(_) => {}
@@ -142,11 +134,9 @@ impl SuiteRunner {
 
     async fn initialize_reply_queue(
         &self,
-        test: &Suite,
+        reply_queue_config: &AmqpQueue,
         channel: &Channel,
     ) -> Result<Queue, Error> {
-        let reply_queue_config = test.reply_amqp_configuration().queue();
-
         let reply_queue = match channel
             .queue_declare(
                 reply_queue_config.name(),
@@ -171,18 +161,18 @@ impl SuiteRunner {
         &mut self,
         test_suite: &mut Suite,
         request_queue: &Queue,
-        reply_queue: &Queue,
+        channel: &Channel,
         result_sender: &Sender<TestResult>,
     ) -> Result<(), Error> {
         let mode = test_suite.run_mode();
 
         match mode {
             RunMode::Sequential => {
-                self.run_sequentially(test_suite, &request_queue, &reply_queue, &result_sender)
+                self.run_sequentially(test_suite, &request_queue, channel, &result_sender)
                     .await?;
             }
             RunMode::Parallel => {
-                self.run_parallelly(test_suite, &request_queue, &reply_queue, &result_sender)
+                self.run_parallelly(test_suite, &request_queue, &result_sender)
                     .await?;
             }
         }
@@ -194,17 +184,17 @@ impl SuiteRunner {
         &self,
         test_suite: &mut Suite,
         request_queue: &Queue,
-        reply_queue: &Queue,
+        channel: &Channel,
         result_sender: &Sender<TestResult>,
     ) -> Result<(), Error> {
         let amqp_instance_config = amqp_instance_config::try_get_from_request_and_reply_amqp(
             test_suite.request_amqp_configuration(),
             test_suite.reply_amqp_configuration(),
         )?;
+        let reply_queue = self.initialize_reply_queue(test_suite.reply_amqp_configuration().queue(), &channel).await?;
+
         let test_suite_name = Arc::new(test_suite.name().to_string());
         let tests = test_suite.shared_tests();
-
-        let channel = self.amqp_connection_manager.try_get_channel().await?;
 
         let assert_script_runner = Arc::new(AssertScriptRunner::try_new(test_suite_name)?);
 
@@ -222,6 +212,14 @@ impl SuiteRunner {
             test_run_instance.run().await?;
         }
 
+        match channel
+            .queue_delete(reply_queue.name().as_str(), QueueDeleteOptions::default())
+            .await
+        {
+            Ok(_) => (),
+            Err(error) => log::error!("failed to delete reply queue: {}", error),
+        }
+
         Ok(())
     }
 
@@ -229,13 +227,14 @@ impl SuiteRunner {
         &mut self,
         test_suite: &mut Suite,
         request_queue: &Queue,
-        reply_queue: &Queue,
         result_sender: &Sender<TestResult>,
     ) -> Result<(), Error> {
         let amqp_instance_config = amqp_instance_config::try_get_from_request_and_reply_amqp(
             test_suite.request_amqp_configuration(),
             test_suite.reply_amqp_configuration(),
         )?;
+        let reply_queue_config = test_suite.reply_amqp_configuration().queue().clone();
+
         let test_suite_name = Arc::new(test_suite.name().to_string());
         let tests = test_suite.shared_tests();
 
@@ -246,9 +245,14 @@ impl SuiteRunner {
             let test_name = test.name().to_string();
             let channel = self.amqp_connection_manager.try_get_channel().await?;
 
+            // reply queues must be initialized per request due to them being treated parallelly,
+            // otherwise a racing condition pops up, since response deliveries may be consumed
+            // in any order.
+            let reply_queue = self.initialize_reply_queue(&reply_queue_config, &channel).await?;
+
             let test_run_instance = RunInstance::new(
                 test.clone(),
-                channel,
+                channel.clone(),
                 request_queue.name().to_string(),
                 reply_queue.name().to_string(),
                 amqp_instance_config.clone(),
@@ -258,7 +262,17 @@ impl SuiteRunner {
 
             let instance_execution = async move {
                 match test_run_instance.run().await {
-                    Ok(_) => log::info!("test '{}' run instance finished", test_name),
+                    Ok(_) => {
+                        log::info!("test '{}' run instance finished", test_name);
+
+                        match channel
+                            .queue_delete(reply_queue.name().as_str(), QueueDeleteOptions::default())
+                            .await
+                        {
+                            Ok(_) => (),
+                            Err(error) => log::error!("failed to delete reply queue: {}", error),
+                        }
+                    },
                     Err(error) => {
                         log::error!(
                             "[{}] test '{}' run instance failed: {}",

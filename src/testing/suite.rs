@@ -62,4 +62,8 @@ impl<'a> Suite {
     pub fn reply_amqp_configuration(&self) -> &Amqp {
         &self.reply_amqp_configuration
     }
+
+    pub fn mut_reply_amqp_configuration(&mut self) -> &mut Amqp {
+        &mut self.reply_amqp_configuration
+    }
 }
