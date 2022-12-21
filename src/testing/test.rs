@@ -11,7 +11,7 @@ const REQUEST_HEADER_TOKEN: &str = "token";
 pub struct Test {
     name: String,
     request: Map<String, Value>,
-    expected_response: Value,
+    assert_script: String,
 }
 
 impl Test {
@@ -55,11 +55,7 @@ impl Test {
         Ok(())
     }
 
-    pub fn is_response_equal_to_expected(&self, response: &Value) -> bool {
-        self.expected_response == *response
-    }
-
-    pub fn expected_response(&self) -> &Value {
-        &self.expected_response
+    pub fn assert_script(&self) -> &str {
+        self.assert_script.as_str()
     }
 }

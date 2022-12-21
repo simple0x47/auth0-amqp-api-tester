@@ -24,6 +24,10 @@ impl Error {
     pub fn kind(&self) -> ErrorKind {
         self.kind
     }
+
+    pub fn message(&self) -> &str {
+        self.message.as_str()
+    }
 }
 
 impl fmt::Display for Error {

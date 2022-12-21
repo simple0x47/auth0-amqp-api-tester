@@ -9,6 +9,7 @@ use futures_util::Future;
 use lapin::options::QueueDeleteOptions;
 use lapin::{Channel, Queue};
 use tokio::sync::mpsc::Sender;
+use crate::testing::assert_script_runner::AssertScriptRunner;
 use crate::testing::test_result::TestResult;
 use crate::testing::run_instance::RunInstance;
 use crate::testing::run_mode::RunMode;
@@ -200,9 +201,12 @@ impl SuiteRunner {
             test_suite.request_amqp_configuration(),
             test_suite.reply_amqp_configuration(),
         )?;
+        let test_suite_name = Arc::new(test_suite.name().to_string());
         let tests = test_suite.shared_tests();
 
         let channel = self.amqp_connection_manager.try_get_channel().await?;
+
+        let assert_script_runner = Arc::new(AssertScriptRunner::try_new(test_suite_name)?);
 
         for test in tests {
             let test_run_instance = RunInstance::new(
@@ -212,6 +216,7 @@ impl SuiteRunner {
                 reply_queue.name().to_string(),
                 amqp_instance_config.clone(),
                 result_sender.clone(),
+                assert_script_runner.clone()
             );
 
             test_run_instance.run().await?;
@@ -234,6 +239,8 @@ impl SuiteRunner {
         let test_suite_name = Arc::new(test_suite.name().to_string());
         let tests = test_suite.shared_tests();
 
+        let assert_script_runner = Arc::new(AssertScriptRunner::try_new(test_suite_name.clone())?);
+
         for test in tests {
             let test_suite_name_clone = test_suite_name.clone();
             let test_name = test.name().to_string();
@@ -246,6 +253,7 @@ impl SuiteRunner {
                 reply_queue.name().to_string(),
                 amqp_instance_config.clone(),
                 result_sender.clone(),
+                assert_script_runner.clone()
             );
 
             let instance_execution = async move {

@@ -8,3 +8,4 @@ pub mod suite_result;
 pub mod suite_result_output;
 pub mod suite_runner;
 mod test_type;
+mod assert_script_runner;
