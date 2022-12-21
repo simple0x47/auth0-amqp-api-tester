@@ -17,6 +17,10 @@ impl Amqp {
         &self.queue
     }
 
+    pub fn mut_queue(&mut self) -> &mut AmqpQueue {
+        &mut self.queue
+    }
+
     pub fn publish_options(&self) -> &Option<BasicPublishOptions> {
         &self.publish_options
     }
